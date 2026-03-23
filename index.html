@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { margin: 0; font-family: sans-serif; overflow: hidden; background: #f8f9fa; }
+        .node circle { fill: #fff; stroke: #007bff; stroke-width: 2px; cursor: pointer; }
+        .node text { font-size: 14px; pointer-events: none; text-anchor: middle; }
+        .link { fill: none; stroke: #ccc; stroke-width: 2px; }
+        #controls { position: absolute; top: 10px; left: 10px; z-index: 10; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        button { cursor: pointer; padding: 5px 10px; }
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <button onclick="addNode()">+ Add Child Node</button>
+    <p><small>Double-click text to Edit<br>Drag nodes to Move</small></p>
+</div>
+
+<svg id="mindmap" width="100vw" height="100vh"></svg>
+
+<script>
+    let data = {
+        nodes: [{ id: "Central Topic", x: window.innerWidth/2, y: window.innerHeight/2 }],
+        links: []
+    };
+
+    const svg = d3.select("#mindmap");
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const simulation = d3.forceSimulation(data.nodes)
+        .force("link", d3.forceLink(data.links).id(d => d.id).distance(100))
+        .force("charge", d3.forceManyBody().strength(-500)) // This handles the "Automatic Rearrange"
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .on("tick", ticked);
+
+    function update() {
+        const link = svg.selectAll(".link").data(data.links);
+        link.exit().remove();
+        const linkEnter = link.enter().append("line").attr("class", "link");
+
+        const node = svg.selectAll(".node").data(data.nodes, d => d.id);
+        node.exit().remove();
+
+        const nodeEnter = node.enter().append("g")
+            .attr("class", "node")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended))
+            .on("dblclick", (event, d) => {
+                const newName = prompt("Edit Node Name:", d.id);
+                if (newName) {
+                    d.id = newName;
+                    update();
+                }
+            });
+
+        nodeEnter.append("circle").attr("r", 30);
+        nodeEnter.append("text").attr("dy", 5).text(d => d.id);
+
+        simulation.nodes(data.nodes);
+        simulation.force("link").links(data.links);
+        simulation.alpha(1).restart();
+    }
+
+    function ticked() {
+        svg.selectAll(".link")
+            .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+
+        svg.selectAll(".node")
+            .attr("transform", d => `translate(${d.x},${d.y})`);
+    }
+
+    function addNode() {
+        const id = "New Node " + data.nodes.length;
+        const parent = data.nodes[Math.floor(Math.random() * data.nodes.length)];
+        data.nodes.push({ id });
+        data.links.push({ source: parent.id, target: id });
+        update();
+    }
+
+    function dragstarted(event) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        event.subject.fx = event.subject.x;
+        event.subject.fy = event.subject.y;
+    }
+    function dragged(event) {
+        event.subject.fx = event.x;
+        event.subject.fy = event.y;
+    }
+    function dragended(event) {
+        if (!event.active) simulation.alphaTarget(0);
+        event.subject.fx = null;
+        event.subject.fy = null;
+    }
+
+    update();
+</script>
+</body>
+</html>
